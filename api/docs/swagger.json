@@ -1,0 +1,655 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Metacloud - CDN API",
+    "version": "1.0.0",
+    "description": "API para upload, download e gerenciamento de arquivos com controle de acesso.",
+    "contact": {
+      "name": "Metasig",
+      "url": "https://metasig.com.br",
+      "email": "desenvolvimento@metasig.com.br"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Servidor de Desenvolvimento"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Key"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do erro."
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID do usuário"
+          },
+          "nome": {
+            "type": "string",
+            "description": "Nome do usuário"
+          },
+          "isAdmin": {
+            "type": "boolean",
+            "description": "Indica se o usuário é administrador"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "UP"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Tempo em segundos que a API está rodando"
+          }
+        }
+      },
+      "FileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Mensagem de sucesso."
+          },
+          "fileId": {
+            "type": "integer",
+            "description": "ID do arquivo no banco de dados."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "O nome final (sanitizado e possivelmente com sufixo) do arquivo no armazenamento, incluindo o path."
+          },
+          "originalName": {
+            "type": "string",
+            "description": "O nome original do arquivo enviado pelo usuário."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "O tipo MIME do arquivo."
+          },
+          "size": {
+            "type": "integer",
+            "description": "O tamanho do arquivo em bytes."
+          },
+          "bucket": {
+            "type": "string",
+            "description": "O nome do bucket onde o arquivo foi salvo."
+          },
+          "url": {
+            "type": "string",
+            "format": "url",
+            "description": "URL pública base para acessar o arquivo."
+          }
+        }
+      },
+      "FileInfoResponse": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string",
+            "description": "Caminho completo do arquivo no armazenamento."
+          },
+          "originalName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploader": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nome do usuário que fez o upload."
+          },
+          "url": {
+            "type": "string",
+            "format": "url"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Verifica a saúde da API.",
+        "description": "Retorna o status da aplicação, timestamp e uptime.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API está operacional.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "Usuário"
+        ],
+        "summary": "Obtém informações do usuário autenticado.",
+        "description": "Retorna ID, nome e status de admin do usuário associado ao token Bearer fornecido.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Informações do usuário.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token não fornecido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token inválido ou expirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/upload": {
+      "post": {
+        "tags": [
+          "Arquivos"
+        ],
+        "summary": "Realiza upload de um novo arquivo.",
+        "description": "Envia um arquivo para um bucket específico, com opção de especificar um diretório e sobrescrever arquivos existentes.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "bucketName"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "O arquivo a ser enviado."
+                  },
+                  "bucketName": {
+                    "type": "string",
+                    "description": "Nome do bucket de destino."
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "(Opcional) Caminho do diretório dentro do bucket."
+                  },
+                  "replace": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "description": "(Opcional) Se \"true\", sobrescreve o arquivo existente. Default: \"false\"."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Arquivo criado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Arquivo substituído com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida (arquivo/bucket ausente, etc).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Proibido (sem permissão no bucket).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/info": {
+      "post": {
+        "tags": [
+          "Arquivos"
+        ],
+        "summary": "Obtém informações de um arquivo.",
+        "description": "Retorna metadados detalhados de um arquivo específico, usando o corpo JSON para os parâmetros. Requer permissão (admin, dono ou acesso ao bucket).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "bucketName",
+                  "path"
+                ],
+                "properties": {
+                  "bucketName": {
+                    "type": "string",
+                    "description": "Nome do bucket onde o arquivo está."
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Caminho completo do arquivo (o 'fileName' retornado no upload)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Informações do arquivo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileInfoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida (parâmetros ausentes no corpo JSON).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Arquivo não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file/download": {
+      "get": {
+        "tags": [
+          "Arquivos"
+        ],
+        "summary": "Faz o download de um arquivo.",
+        "description": "Retorna o conteúdo binário de um arquivo específico para download. Requer permissão.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "bucketName",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Nome do bucket."
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Caminho completo do arquivo."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conteúdo do arquivo.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Sugere o nome do arquivo para salvar."
+              },
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Tipo MIME do arquivo."
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Tamanho do arquivo em bytes."
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Arquivo não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno ou no armazenamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file": {
+      "delete": {
+        "tags": [
+          "Arquivos"
+        ],
+        "summary": "Exclui um arquivo.",
+        "description": "Remove um arquivo específico do MinIO e seu registro do banco de dados. Requer permissão.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "bucketName",
+                  "path"
+                ],
+                "properties": {
+                  "bucketName": {
+                    "type": "string",
+                    "description": "Nome do bucket."
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Caminho completo do arquivo a ser excluído."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Arquivo excluído com sucesso."
+          },
+          "400": {
+            "description": "Requisição inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Arquivo não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno ou no armazenamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

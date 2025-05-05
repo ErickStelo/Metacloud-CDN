@@ -1,0 +1,26 @@
+services:
+  # Serviço nginx removido - será executado externamente
+
+  minio1:
+    image: minio/minio:latest
+    container_name: metacloud_cdn_minio_node1
+    ports:
+      - "9000:9000" # Porta da API S3
+      - "9001:9001" # Porta do Console Web
+    volumes:
+      - ./data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    networks:
+      - metacloud-shared-net
+    # Comando para iniciar MinIO standalone no diretório /data
+    # command: server /data --console-address ":9001" 
+    
+    # Comando para iniciar MinIO em cluster com outros nós
+    # Apontar para os outros servicos do MinIO em suas respectivas portas e diretorios
+    command: server --console-address ":9001" "http://minio1:9000/data" "http://minio2:9000/data"
+
+networks:
+  metacloud-shared-net:
+    external: true

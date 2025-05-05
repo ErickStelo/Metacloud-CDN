@@ -1,0 +1,11 @@
+services:
+    backend:
+    image: node:lts
+    working_dir: /usr/src/app
+    container_name: metacloud_cdn_api
+    ports:
+      - "80:80" # Porta da API para o NGINX API (cdnapi...)
+
+    networks:
+      - metacloud-net
+    command: npm run dev
