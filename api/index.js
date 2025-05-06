@@ -13,7 +13,7 @@ const helmet = require('helmet');
 const errorHandler = require('./middleware/errorHandler'); // Importar o handler de erro
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.API_PORT || 3000;
 
 // Ler o arquivo swagger.json
 const swaggerFilePath = path.join(__dirname, 'docs', 'swagger.json');

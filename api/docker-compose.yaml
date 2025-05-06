@@ -1,11 +1,18 @@
 services:
-    backend:
-    image: node:lts
+  api:
+    image: node:jod-slim # Versao usada no desenvolvimento: v22.15.0
     working_dir: /usr/src/app
     container_name: metacloud_cdn_api
     ports:
-      - "80:80" # Porta da API para o NGINX API (cdnapi...)
-
-    networks:
-      - metacloud-net
+      - "9710:80"
     command: npm run dev
+    volumes:
+      - ./api:/usr/src/app
+    extra_hosts:
+      - "postgres-host:host-gateway" # Informar o host do postgres
+    networks:
+     - metacloud-cdn-shared-net
+
+networks:
+  metacloud-cdn-shared-net:
+    driver: bridge

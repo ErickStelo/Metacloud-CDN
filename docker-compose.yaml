@@ -1,4 +1,17 @@
 services:
+  api:
+    image: node:jod-slim # Versao usada no desenvolvimento: v22.15.0
+    working_dir: /usr/src/app
+    container_name: metacloud_cdn_api
+    ports:
+      - "9710:80"
+    command: npm run dev
+    volumes:
+      - ./api:/usr/src/app
+    extra_hosts:
+      - "postgres-host:host-gateway" # Informar o host do postgres
+    networks:
+     - metacloud-cdn-shared-net
   minio:
     image: "minio/minio:RELEASE.2025-04-08T15-41-24Z"
     container_name: metacloud_cdn_minio
