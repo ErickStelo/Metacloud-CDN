@@ -3,6 +3,7 @@ services:
     image: node:jod-slim # Versao usada no desenvolvimento: v22.15.0
     working_dir: /usr/src/app
     container_name: metacloud_cdn_api
+    restart: unless-stopped
     ports:
       - "9710:80"
     command: npm run dev
@@ -22,7 +23,7 @@ services:
     volumes:
       - ./minio/data:/data
     environment:
-      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: minioadmin
     networks:
       - metacloud-cdn-shared-net
